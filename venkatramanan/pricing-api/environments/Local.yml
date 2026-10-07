@@ -1,0 +1,11 @@
+name: Local
+variables:
+  - name: baseUrl
+    value: https://tesco-api.greenstreet.com
+  - name: clientId
+    value: tesco-client
+  - secret: true
+    name: clientSecret
+    description: ""
+  - secret: true
+    name: token

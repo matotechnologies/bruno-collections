@@ -1,0 +1,53 @@
+info:
+  name: Get Observations
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/observations?limit=3"
+  params:
+    - name: limit
+      value: "3"
+      type: query
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Basic page assertions and schema validation", function() {
+          expect(res.getStatus()).to.equal(200);
+
+          const body = res.getBody();
+
+          expect(body).to.include.all.keys("data", "offset", "limit", "total");
+
+            expect(body.data.length).to.be.at.most(body.limit);
+
+         
+          for (const row of body.data) {
+            
+            if (row.PACK_SIZE !== null && row.PACK_SIZE !== undefined) {
+              expect(row.PACK_SIZE).to.be.a("string");
+            }
+
+            expect(row.AUDIT_TYPE_ID).to.be.oneOf([1, 2, 3]);
+
+
+            for (const [key, value] of Object.entries(row)) {
+              if (key.toLowerCase().includes("price") && value !== null && value !== undefined) {
+                expect(value).to.be.a("string");
+              }
+            }
+          }
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

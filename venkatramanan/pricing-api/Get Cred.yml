@@ -1,0 +1,49 @@
+info:
+  name: Get Cred
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/oauth/token"
+  body:
+    type: json
+    data: |-
+      {
+        "client_id": "{{clientId}}",
+        "client_secret": "{{clientSecret}}",
+        "grant_type": "client_credentials"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: bru.setEnvVar("token", res.getBody().access_token);
+    - type: tests
+      code: |-
+        test("Status code is 200", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("Token type is Bearer", function() {
+          const data = res.getBody();
+          expect(data.token_type).to.equal("Bearer");
+        });
+
+        test("Expiry is a number", function(){
+          const data = res.getBody();
+          expect(data.expires_in).to.be.a("number");
+        });
+
+        test("Token varibale is set", function(){
+          const token = bru.getEnvVar("token");
+          expect(token).to.not.be.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
