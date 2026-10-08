@@ -1,0 +1,12 @@
+name: Training
+variables:
+  - name: baseUrl
+    value: https://tesco-api.greenstreet.com
+    description: ""
+  - name: clientId
+    value: tesco-client
+    description: ""
+  - secret: true
+    name: clientSecret
+  - secret: true
+    name: token
