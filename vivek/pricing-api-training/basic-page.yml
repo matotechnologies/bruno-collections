@@ -1,0 +1,88 @@
+info:
+  name: basic-page
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/observations?limit=3"
+  params:
+    - name: limit
+      value: "3"
+      type: query
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const INT = "integer", STR = "string";
+
+        const required = {
+          EFFECTIVE_DATE: STR, UPLOAD_DATE: STR, AGENCY_REF: INT, COMPETITOR_ID: INT,
+          STORE_NUMBER: INT, PRODUCT_ID: STR, COMPANY_AREA: STR,
+          COMPETITOR_SECTION_DESC: STR, COMPETITOR_GROUP_DESC: STR,
+          COMPETITOR_SUBGROUP_DESC: STR, BRAND_IND: STR, BRAND_NAME: STR,
+          COMPETITOR_PRODUCT_DESC: STR, MULTIPACK_QTY: INT, PACK_SIZE: STR, UOM: STR,
+          TOTAL_SIZE: STR, STOCK_STATUS: STR, COMPETITOR_SELLING_PRICE: STR,
+          AUDIT_TYPE_ID: INT
+        };
+
+
+        const optional = {
+          GTIN: STR, PROMOTION_DESCRIPTION: STR, PROMOTION_MECHANIC_ID: INT,
+          PROMOTION_MECHANIC: STR, CAMPAIGN: STR, TRIGGER_QTY: INT,
+          PRE_PROMOTION_PRICE: STR, PROMOTION_PRICE: STR, PROMOTION_PRODUCT_PRICE: STR,
+          SUGGESTED_TPNB_MATCH: STR, SUGGESTED_CONV_FACTOR: STR,
+          SUGGESTED_NON_MATCH_REASON: STR, SUGGESTED_SUBGROUP: STR, COUNTRY_ID: INT,
+          FRONT_PRODUCT_IMAGE_URL: STR, BACK_PRODUCT_IMAGE_URL: STR
+        };
+
+
+        const decimals = ["PACK_SIZE", "TOTAL_SIZE", "COMPETITOR_SELLING_PRICE",
+          "PRE_PROMOTION_PRICE", "PROMOTION_PRICE", "PROMOTION_PRODUCT_PRICE",
+          "SUGGESTED_CONV_FACTOR"];
+
+        const typeOk = (v, t) => t === INT ? Number.isInteger(v) : typeof v === "string";
+
+        test("status is 200", function () {
+          expect(res.status).to.equal(200);
+        });
+
+        test("body has data, offset, limit, total", function () {
+          expect(res.body).to.have.all.keys("data", "offset", "limit", "total");
+          expect(res.body.data).to.be.an("array");
+        });
+
+        test("data length is at most the limit", function () {
+          expect(res.body.data.length).to.be.at.most(res.body.limit);
+        });
+
+        test("every row matches ObservationRow", function () {
+          res.body.data.forEach((row, i) => {
+            for (const [f, t] of Object.entries(required)) {
+              expect(row, `row ${i} missing ${f}`).to.have.property(f);
+              expect(typeOk(row[f], t), `row ${i} ${f} wrong type`).to.be.true;
+            }
+            for (const [f, t] of Object.entries(optional)) {
+              if (row[f] !== undefined && row[f] !== null) {
+                expect(typeOk(row[f], t), `row ${i} ${f} wrong type`).to.be.true;
+              }
+            }
+            decimals.forEach(f => {
+              if (row[f] !== undefined && row[f] !== null) {
+                expect(row[f], `row ${i} ${f}`).to.match(/^-?\d+(\.\d+)?$/);
+              }
+            });
+            expect([1, 2, 3]).to.include(row.AUDIT_TYPE_ID);
+          });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
