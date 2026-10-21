@@ -1,0 +1,485 @@
+openapi: 3.0.3
+info:
+  title: GreenStreet Pricing Observation Service API
+  version: 1.0.0
+  description: Complete OpenAPI contract generated from GreenStreet-Explore-Bruno collection testing.
+servers:
+  - url: https://tesco-api.greenstreet.com
+    description: Dev Server
+
+paths:
+  /oauth/token:
+    post:
+      tags:
+        - Authentication
+      summary: Obtain Bearer access token via client credentials
+      description: Exchanges OAuth2 client credentials (`client_id`, `client_secret`, and `grant_type`) for a JWT access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - client_id
+                - client_secret
+                - grant_type
+              properties:
+                client_id:
+                  type: string
+                  example: "tesco-client"
+                client_secret:
+                  type: string
+                  format: password
+                  example: "secret123"
+                grant_type:
+                  type: string
+                  enum:
+                    - client_credentials
+                  example: "client_credentials"
+      responses:
+        '200':
+          description: Token successfully generated
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - access_token
+                  - token_type
+                  - expires_in
+                properties:
+                  access_token:
+                    type: string
+                    description: JWT bearer token
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  token_type:
+                    type: string
+                    example: "Bearer"
+                  expires_in:
+                    type: integer
+                    description: Token validity in seconds
+                    example: 3600
+        '401':
+          description: Unauthorized - Invalid or missing credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidCredentials:
+                  summary: Invalid client credentials
+                  value:
+                    detail: "Invalid or expired token"
+
+  /observations:
+    get:
+      tags:
+        - Observations
+      summary: Query observations list or stream
+      description: >-
+        Fetches price observations with pagination, date window filters, and competitor filtering.
+        Supports NDJSON streaming when requested via header.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of records to return
+          schema:
+            type: integer
+            example: 5
+        - name: offset
+          in: query
+          required: false
+          description: Number of records to skip for pagination
+          schema:
+            type: integer
+            example: 5
+        - name: start_date
+          in: query
+          required: false
+          description: Start of the effective date window (YYYY-MM-DD). Must be on or before end_date.
+          schema:
+            type: string
+            format: date
+            example: "2026-08-01"
+        - name: end_date
+          in: query
+          required: false
+          description: End of the effective date window (YYYY-MM-DD). Must be on or after start_date.
+          schema:
+            type: string
+            format: date
+            example: "2026-08-31"
+        - name: competitor_id
+          in: query
+          required: false
+          description: Filter observations by competitor ID
+          schema:
+            type: integer
+            example: 1
+        - name: upload_date
+          in: query
+          required: false
+          description: Filter by exact upload date (YYYY-MM-DD). Mutually exclusive with upload_date_start/upload_date_end.
+          schema:
+            type: string
+            format: date
+            example: "2026-09-02"
+        - name: upload_date_start
+          in: query
+          required: false
+          description: Start of upload date window (YYYY-MM-DD). Required when upload_date_end is provided.
+          schema:
+            type: string
+            format: date
+            example: "2026-09-01"
+        - name: upload_date_end
+          in: query
+          required: false
+          description: End of upload date window (YYYY-MM-DD). Requires upload_date_start.
+          schema:
+            type: string
+            format: date
+            example: "2026-09-10"
+        - name: X-Stream-Response
+          in: header
+          required: false
+          description: Enable newline-delimited JSON (NDJSON) streaming
+          schema:
+            type: boolean
+            example: true
+      responses:
+        '200':
+          description: Observations retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationsResponse'
+              examples:
+                sampleObservation:
+                  summary: Observation record sample
+                  value:
+                    data:
+                      - EFFECTIVE_DATE: "2026-08-31"
+                        UPLOAD_DATE: "2026-09-02"
+                        AGENCY_REF: 3
+                        COMPETITOR_ID: 1
+                        STORE_NUMBER: 1001
+                        PRODUCT_ID: "AC01270"
+                        GTIN: "27618868"
+                        COMPANY_AREA: "FOOD"
+                        COMPETITOR_SECTION_DESC: "PRODUCE"
+                        COMPETITOR_GROUP_DESC: "PRODUCE"
+                        COMPETITOR_SUBGROUP_DESC: "FRUIT PRODUCE"
+                        BRAND_IND: "OL"
+                        BRAND_NAME: "OL"
+                        COMPETITOR_PRODUCT_DESC: "OL KIWI (4PK)"
+                        MULTIPACK_QTY: 4
+                        PACK_SIZE: "1.0000"
+                        UOM: "PACK"
+                        TOTAL_SIZE: "4.0000"
+                        STOCK_STATUS: "IN STOCK"
+                        COMPETITOR_SELLING_PRICE: "1.4700"
+                        PROMOTION_DESCRIPTION: null
+                        PROMOTION_MECHANIC_ID: null
+                        PROMOTION_MECHANIC: null
+                        CAMPAIGN: null
+                        TRIGGER_QTY: null
+                        PRE_PROMOTION_PRICE: null
+                        PROMOTION_PRICE: null
+                        PROMOTION_PRODUCT_PRICE: null
+                        SUGGESTED_TPNB_MATCH: "52844621"
+                        SUGGESTED_CONV_FACTOR: "1.0000"
+                        SUGGESTED_NON_MATCH_REASON: null
+                        SUGGESTED_SUBGROUP: "F11RA"
+                        COUNTRY_ID: null
+                        AUDIT_TYPE_ID: 1
+            application/x-ndjson:
+              schema:
+                type: string
+                description: Newline-delimited JSON stream of observation objects
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noToken:
+                  summary: Missing Token
+                  value:
+                    detail: "Missing or invalid Authorization header"
+                badToken:
+                  summary: Bad or Expired Token
+                  value:
+                    detail: "Invalid or expired token"
+        '422':
+          description: Unprocessable Entity - Validation, schema, or filter conflict error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unknownParam:
+                  summary: Unknown Query Parameter
+                  value:
+                    detail: "Unknown query parameter(s): foo"
+                conflictingFilters:
+                  summary: Mutually Exclusive Filters
+                  value:
+                    detail: "Use upload_date or upload_date_start/upload_date_end, not both"
+                missingRangeStart:
+                  summary: Missing Range Start
+                  value:
+                    detail: "upload_date_end requires upload_date_start"
+                endBeforeStart:
+                  summary: Chronological Order Violation
+                  value:
+                    detail: "end_date must be on or after start_date"
+                malformedDate:
+                  summary: Malformed Date Parsing Error
+                  value:
+                    detail:
+                      - type: "date_from_datetime_parsing"
+                        loc:
+                          - "query"
+                          - "start_date"
+                        msg: "Input should be a valid date or datetime, month value is outside expected range of 1-12"
+                        input: "2026-13-40"
+                        ctx:
+                          error: "month value is outside expected range of 1-12"
+    post:
+      tags:
+        - Observations
+      summary: Disallowed HTTP method test
+      description: Verifies that unsupported HTTP verbs are rejected on /observations.
+      security:
+        - BearerAuth: []
+      responses:
+        '405':
+          description: Method Not Allowed - POST is not supported on /observations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                methodNotAllowed:
+                  summary: Method Not Allowed
+                  value:
+                    detail: "Method Not Allowed"
+
+  /upload-dates:
+    get:
+      tags:
+        - Upload Dates
+      summary: Retrieve list of available upload dates
+      description: Returns unique dates on which observations have been ingested.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of upload dates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: date
+                  example: "2026-08-01"
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noToken:
+                  summary: Missing Token
+                  value:
+                    detail: "Missing or invalid Authorization header"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Observation:
+      type: object
+      properties:
+        EFFECTIVE_DATE:
+          type: string
+          format: date
+          example: "2026-08-31"
+        UPLOAD_DATE:
+          type: string
+          format: date
+          example: "2026-09-02"
+        AGENCY_REF:
+          type: integer
+          example: 3
+        COMPETITOR_ID:
+          type: integer
+          example: 1
+        STORE_NUMBER:
+          type: integer
+          example: 1001
+        PRODUCT_ID:
+          type: string
+          example: "AC01270"
+        GTIN:
+          type: string
+          example: "27618868"
+        COMPANY_AREA:
+          type: string
+          example: "FOOD"
+        COMPETITOR_SECTION_DESC:
+          type: string
+          example: "PRODUCE"
+        COMPETITOR_GROUP_DESC:
+          type: string
+          example: "PRODUCE"
+        COMPETITOR_SUBGROUP_DESC:
+          type: string
+          example: "FRUIT PRODUCE"
+        BRAND_IND:
+          type: string
+          example: "OL"
+        BRAND_NAME:
+          type: string
+          example: "OL"
+        COMPETITOR_PRODUCT_DESC:
+          type: string
+          example: "OL KIWI (4PK)"
+        MULTIPACK_QTY:
+          type: integer
+          example: 4
+        PACK_SIZE:
+          type: string
+          example: "1.0000"
+        UOM:
+          type: string
+          example: "PACK"
+        TOTAL_SIZE:
+          type: string
+          example: "4.0000"
+        STOCK_STATUS:
+          type: string
+          example: "IN STOCK"
+        COMPETITOR_SELLING_PRICE:
+          type: string
+          example: "1.4700"
+        PROMOTION_DESCRIPTION:
+          type: string
+          nullable: true
+          example: null
+        PROMOTION_MECHANIC_ID:
+          type: integer
+          nullable: true
+          example: null
+        PROMOTION_MECHANIC:
+          type: string
+          nullable: true
+          example: null
+        CAMPAIGN:
+          type: string
+          nullable: true
+          example: null
+        TRIGGER_QTY:
+          type: integer
+          nullable: true
+          example: null
+        PRE_PROMOTION_PRICE:
+          type: string
+          nullable: true
+          example: null
+        PROMOTION_PRICE:
+          type: string
+          nullable: true
+          example: null
+        PROMOTION_PRODUCT_PRICE:
+          type: string
+          nullable: true
+          example: null
+        SUGGESTED_TPNB_MATCH:
+          type: string
+          example: "52844621"
+        SUGGESTED_CONV_FACTOR:
+          type: string
+          example: "1.0000"
+        SUGGESTED_NON_MATCH_REASON:
+          type: string
+          nullable: true
+          example: null
+        SUGGESTED_SUBGROUP:
+          type: string
+          example: "F11RA"
+        COUNTRY_ID:
+          type: integer
+          nullable: true
+          example: null
+        AUDIT_TYPE_ID:
+          type: integer
+          example: 1
+
+    ObservationsResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Observation'
+
+    ValidationErrorItem:
+      type: object
+      required:
+        - type
+        - loc
+        - msg
+        - input
+      properties:
+        type:
+          type: string
+          example: "date_from_datetime_parsing"
+        loc:
+          type: array
+          items:
+            type: string
+          example:
+            - "query"
+            - "start_date"
+        msg:
+          type: string
+          example: "Input should be a valid date or datetime, month value is outside expected range of 1-12"
+        input:
+          type: string
+          example: "2026-13-40"
+        ctx:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "month value is outside expected range of 1-12"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          oneOf:
+            - type: string
+              description: Textual error or business rule message
+              example: "Missing or invalid Authorization header"
+            - type: array
+              description: Structured validation failure list from Pydantic
+              items:
+                $ref: '#/components/schemas/ValidationErrorItem'
