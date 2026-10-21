@@ -1,0 +1,245 @@
+openapi: 3.1.0
+
+info:
+  title: GreenStreet Pricing API
+  description: API contract for positive and negative observation tests.
+  version: 1.0.0
+
+servers:
+  - url: https://tesco-api.greenstreet.com
+
+tags:
+  - name: Authentication
+  - name: Observations - Positive
+  - name: Observations - Negative
+  - name: Upload Dates
+
+paths:
+  /oauth/token:
+    post:
+      tags:
+        - Authentication
+      summary: Get access token
+      operationId: getAccessToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - client_id
+                - client_secret
+                - grant_type
+              properties:
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                  format: password
+                grant_type:
+                  type: string
+                  examples:
+                    - client_credentials
+  
+      responses:
+        '200':
+          description: Token returned successfully.
+        '400':
+          description: Invalid authentication request.
+        '401':
+          description: Authentication failed.
+
+  /observations:
+    get:
+      tags:
+        - Observations - Positive
+      summary: Get pricing observations
+      description: >
+        Retrieve observations using pagination, filters, date windows,
+        or streaming options. Negative responses document invalid
+        requests to this endpoint.
+      operationId: getObservations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Maximum number of observations to return.
+
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Number of observations to skip.
+
+        - name: competitor_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Competitor filter.
+
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+
+        - name: upload_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+
+        - name: upload_date_start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+
+        - name: upload_date_end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+
+        - name: X-Stream-Response
+          in: header
+          required: false
+          schema:
+            type: boolean
+
+      responses:
+        '200':
+          description: Observations returned successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            application/x-ndjson:
+              schema:
+                type: string
+                description: Newline-delimited JSON records.
+
+        '400':
+          description: Invalid query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '401':
+          description: Missing or invalid authentication token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '404':
+          description: Requested resource not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '422':
+          description: Request validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '429':
+          description: Request rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Observations - Negative
+      summary: Test unsupported HTTP method
+      description: >
+        Negative test for POST /observations.
+        Confirm the actual status and response from Bruno.
+      operationId: negativePostObservations
+      security:
+        - BearerAuth: []
+      responses:
+        '401':
+          description: Authentication required, if returned.
+        '405':
+          description: HTTP method not allowed, if returned.
+        default:
+          description: Other response observed from the API.
+
+  /upload-dates:
+    get:
+      tags:
+        - Upload Dates
+      summary: Get available upload dates
+      operationId: getUploadDates
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Upload dates returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: date
+        '401':
+          description: Authentication required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        detail:
+          type: string
+      additionalProperties: true
