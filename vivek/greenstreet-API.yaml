@@ -12,7 +12,7 @@ tags:
   - name: Observations
   - name: Reference data
 paths:
-  /oauth/token:
+  /oauth/token: 
     post:
       tags: [Authentication]
       summary: Obtain an access token
