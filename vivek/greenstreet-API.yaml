@@ -151,11 +151,10 @@ paths:
           in: query
           required: false
           description: Inclusive end of the upload-date range (YYYY-MM-DD); collection tests this without upload_date_start.
-        
           schema:
-            type: boolean
-            default: false
-          example: true
+            type: string
+            format: date
+          example: '2026-09-10'
       responses:
         '200':
           description: Observations returned. JSON by default.
