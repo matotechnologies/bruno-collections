@@ -1,0 +1,415 @@
+openapi: 3.0.3
+info:
+  title: GreenStreet Pricing API
+  version: 1.0.0
+  description: |
+    OpenAPI contract derived from the GreenStreet-Explore-Bruno collection.
+servers:
+  - url: https://tesco-api.greenstreet.com
+    description: Green Street QA
+tags:
+  - name: Authentication
+  - name: Observations
+  - name: Reference data
+paths:
+  /oauth/token: 
+    post:
+      tags: [Authentication]
+      summary: Obtain an access token
+      description: Obtain an access token.
+      operationId: createAccessToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, client_secret, grant_type]
+              properties:
+                client_id:
+                  type: string
+                  description: OAuth client identifier.
+                  example: tesco-client
+                client_secret:
+                  type: string
+                  format: password
+                  description: OAuth client secret. Do not publish real secrets.
+                grant_type:
+                  type: string
+                  enum: [client_credentials]
+                  example: client_credentials
+      responses:
+        '200':
+          description: Access token issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token]
+                properties:
+                  access_token:
+                    type: string
+                    description: Bearer access token.
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    description: Token lifetime in seconds, if supplied.
+                  scope:
+                    type: string
+                    description: Granted scope, if supplied.
+                additionalProperties: true
+              example:
+                access_token: eyJ...redacted
+                token_type: Bearer
+                expires_in: 3600
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Client credentials are missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: Invalid client credentials
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /observations:
+    get:
+      tags: [Observations]
+      summary: List pricing observations
+      description: list pricing observations
+        
+      operationId: listObservations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: maximum number of records to return
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+          example: 3
+        - name: offset
+          in: query
+          required: false
+          description: Number of records to skip for pagination.
+          schema:  
+            type: integer
+            minimum: 0
+            default: 0
+          example: 5
+        - name: competitor_id
+          in: query
+          required: false
+          description: Filter observations by competitor identifier.
+          schema:
+            type: integer
+          example: 1
+        - name: start_date
+          in: query
+          required: false
+          description: Inclusive start of the effective-date window (YYYY-MM-DD).
+          schema:
+            type: string
+            format: date
+          example: '2026-08-01'
+        - name: end_date
+          in: query
+          required: false
+          description: Inclusive end of the effective-date window (YYYY-MM-DD); used with start_date.
+          schema:
+            type: string
+            format: date
+          example: '2026-08-31'
+        - name: upload_date
+          in: query
+          required: false
+          description: Filter by a single upload date (YYYY-MM-DD). The collection also tests this together with an upload-date range.
+          schema:
+            type: string
+            format: date
+          example: '2026-09-02'
+        - name: upload_date_start
+          in: query
+          required: false
+          description: Inclusive start of the upload-date range (YYYY-MM-DD).
+          schema:
+            type: string
+            format: date
+          example: '2026-09-01'
+        - name: upload_date_end
+          in: query
+          required: false
+          description: Inclusive end of the upload-date range (YYYY-MM-DD); collection tests this without upload_date_start.
+          schema:
+            type: string
+            format: date
+          example: '2026-09-10'
+      responses:
+        '200':
+          description: Observations returned. JSON by default.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ObservationPage'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Observation'
+                  - type: object
+                    additionalProperties: true
+              example:
+                items: []
+                total: 0
+                limit: 3
+                offset: 0
+            application/x-ndjson:
+              schema:
+                type: string
+                description: One JSON observation per line, separated by newline characters.
+              example: |
+                {"id":1,"competitor_id":1}
+                {"id":2,"competitor_id":1}
+        '400':
+          description: Invalid query parameter, malformed date, invalid date range, or conflicting filters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                malformedDate:
+                  summary: Malformed date
+                  value:
+                    detail: Invalid date
+                endBeforeStart:
+                  summary: End date before start date
+                  value:
+                    detail: End date must be on or after start date
+                invalidRange:
+                  summary: Range end supplied without range start
+                  value:
+                    detail: Range start is required
+                unknownParameter:
+                  summary: Unknown query parameter
+                  value:
+                    detail: Unknown parameter
+                conflictingFilters:
+                  summary: Conflicting date filters
+                  value:
+                    detail: Conflicting date filters
+        '401':
+          description: Missing, malformed, expired, or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingToken:
+                  summary: Missing Authorization header
+                  value:
+                    detail: Missing or invalid Authorization header
+                badToken:
+                  summary: Invalid bearer token
+                  value:
+                    detail: Invalid or expired token
+        '405':
+          description: Method not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: Method not allowed
+        '422':
+          description: Request validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rate or concurrency limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [Observations]
+      summary: Unsupported method
+      description: |
+        Unsupported method
+      operationId: postObservationsNegativeProbe
+      security:
+        - bearerAuth: []
+      responses:
+        '405':
+          description: Method not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: Method not allowed
+        '401':
+          description: Authentication rejected before method handling.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Route not found .
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /upload-dates:
+    get:
+      tags: [Reference data]
+      summary: List available upload dates
+      description: Returns upload-date values available for pricing observations.
+      operationId: listUploadDates
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Available upload dates returned.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      type: string
+                      format: date
+                  - type: object
+                    additionalProperties: true
+              example:
+                dates:
+                  - '2026-09-02'
+                  - '2026-09-10'
+        '401':
+          description: Missing, malformed, expired, or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: Missing or invalid Authorization header
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /does-not-exist:
+    get:
+      tags: [Observations]
+      summary: Unknown-path negative test
+      description: This path is deliberately requested by the Bruno collection to inspect the API's not-found response.
+      operationId: unknownPathNegativeProbe
+      security:
+        - bearerAuth: []
+      responses:
+        '404':
+          description: The requested route does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: Not Found
+        '401': 
+          description: Authentication may be enforced before route resolution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Obtain a token from POST /oauth/token using the client-credentials
+        grant, then send `Authorization: Bearer <access_token>`.
+  schemas:
+    Error:
+      type: object
+      description: Generic API error body. Exact fields may vary by error.
+      properties:
+        detail:
+          type: string
+        message:
+          type: string
+        error:
+          type: string
+        code:
+          oneOf:
+            - type: string
+            - type: integer
+      additionalProperties: true
+    Observation:
+      type: object
+      description: Pricing observation. Add exact properties after inspecting a real response.
+      properties:
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+        competitor_id:
+          type: integer
+      additionalProperties: true
+    ObservationPage:
+      type: object
+      description: Paginated response shape; confirm field names and types against the live response.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Observation'
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Observation'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Observation'
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+        offset:
+          type: integer
+      additionalProperties: true
+  responses:
+    BadRequest:
+      description: Request is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnsupportedMediaType:
+      description: Request content type is not supported.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
